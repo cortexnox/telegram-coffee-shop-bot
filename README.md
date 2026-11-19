@@ -1,27 +1,28 @@
-# Telegram-бот кофейни
+# Coffee Shop Telegram Bot
 
-Telegram-бот для кофейни с каталогом товаров, корзиной и оформлением заказов. Клиент может выбрать кофе, выпечку или десерт, указать способ получения заказа (самовывоз или доставка) и оставить контактный номер.
+A Telegram bot for a coffee shop featuring a product catalog, shopping cart, and order checkout. Customers can browse coffee, pastries, and desserts, choose a pickup or delivery option, and provide their contact phone number.
 
-Владелец получает уведомления о новых заказах, меняет их статусы прямо в Telegram и просматривает статистику за день.
+The shop owner receives notifications about new orders, updates order statuses directly in Telegram, and views daily sales statistics.
 
-## Возможности
+## Features
 
-- Каталог с категориями: кофе, выпечка и десерты.
-- Карточки товаров с описанием, ценой и выбором количества.
-- Корзина: добавление и удаление товаров, очистка корзины.
-- Оформление заказа: самовывоз или доставка.
-- Ввод адреса и номера телефона.
-- Автоматический расчёт стоимости доставки.
-- Бесплатная доставка при заказе от установленной суммы.
-- Раздел «Мои заказы» с последними заказами и статусами.
-- Уведомления клиента об изменении статуса заказа.
-- Административные кнопки для управления заказами.
-- `/admin` — количество заказов и сумма за день, последние 10 заказов.
+- Product catalog with categories: coffee, bakery, and desserts.
+- Product cards with descriptions, prices, and quantity selection.
+- Shopping cart: add and remove products, clear the cart.
+- Order checkout with pickup or delivery options.
+- Address and phone number collection.
+- Automatic delivery fee calculation.
+- Free delivery for orders above a specified amount.
+- "My Orders" section with recent orders and their statuses.
+- Customer notifications when order statuses change.
+- Administrative buttons for order management.
+- `/admin` — daily order count, total revenue, and the 10 most recent orders.
 
-## Запуск
+## Installation and Setup
 
-1. Создайте бота через [@BotFather](https://t.me/BotFather) и получите токен.
-2. Создайте файл `.env`:
+1. Create a bot using [@BotFather](https://t.me/BotFather) and obtain your bot token.
+
+2. Create a `.env` file:
 
 ```env
 BOT_TOKEN=your_bot_token
@@ -29,13 +30,13 @@ ADMIN_ID=your_telegram_id
 DB_PATH=shop.db
 ```
 
-3. Создайте виртуальное окружение:
+3. Create a virtual environment:
 
 ```bash
 python -m venv .venv
 ```
 
-4. Активируйте его:
+4. Activate the virtual environment:
 
 ```bash
 # Windows
@@ -45,64 +46,80 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-5. Установите зависимости:
+5. Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-6. Запустите бота:
+6. Start the bot:
 
 ```bash
 python bot.py
 ```
 
-База данных SQLite и необходимые таблицы создаются автоматически при первом запуске.
+The SQLite database and all required tables are created automatically on the first launch.
 
-## Настройка под клиента
+## Customization
 
-В начале `bot.py` можно изменить название кофейни, валюту, стоимость доставки, сумму для бесплатной доставки, категории, товары, описания и цены.
+You can customize the bot by editing the configuration section at the beginning of `bot.py`.
 
-Контактная информация и приветственное сообщение также настраиваются в коде.
+Available settings include:
 
-## Команды
+- Shop name.
+- Currency.
+- Delivery fee.
+- Minimum order amount for free delivery.
+- Product categories.
+- Product names and descriptions.
+- Product prices.
 
-- `/start` — главное меню.
-- `/orders` — последние заказы клиента.
-- `/cancel` — отмена оформления заказа.
-- `/admin` — статистика и последние заказы (только владелец).
+The welcome message and contact information can also be customized directly in the code.
 
-## Стек
+## Bot Commands
 
-Python, aiogram 3, SQLite, aiosqlite, asyncio, FSM, python-dotenv.
+- `/start` — open the main menu.
+- `/orders` — view the customer's recent orders.
+- `/cancel` — cancel the current checkout process.
+- `/admin` — view daily statistics and recent orders (owner only).
 
-## Скриншоты
+## Tech Stack
 
-### 1. Главное меню
+- Python
+- aiogram 3
+- SQLite
+- aiosqlite
+- asyncio
+- FSM (Finite State Machine)
+- python-dotenv
 
-![Главное меню](screenshots/01_welcome.png)
+## Screenshots
 
-### 2. Каталог
+### 1. Main Menu
 
-![Каталог товаров](screenshots/02_catalog.png)
+![Main Menu](screenshots/01_welcome.png)
 
-### 3. Карточка товара
+### 2. Product Catalog
 
-![Карточка товара](screenshots/03_product.png)
+![Product Catalog](screenshots/02_catalog.png)
 
-### 4. Корзина
+### 3. Product Details
 
-![Корзина](screenshots/04_cart.png)
+![Product Details](screenshots/03_product.png)
 
-### 5. Оформление заказа
+### 4. Shopping Cart
 
-![Выбор способа получения](screenshots/05_checkout.png)
+![Shopping Cart](screenshots/04_cart.png)
 
-### 6. Подтверждение заказа
+### 5. Checkout
 
-![Подтверждение заказа](screenshots/06_confirmation.png)
+![Delivery Method Selection](screenshots/05_checkout.png)
 
-## Структура проекта
+### 6. Order Confirmation
+
+![Order Confirmation](screenshots/06_confirmation.png)
+
+## Project Structure
 
 ```text
 telegram-coffee-shop-bot/
@@ -120,3 +137,7 @@ telegram-coffee-shop-bot/
     ├── 05_checkout.png
     └── 06_confirmation.png
 ```
+
+---
+
+**Built with Python and aiogram 3.**

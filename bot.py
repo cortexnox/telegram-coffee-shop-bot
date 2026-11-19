@@ -1,10 +1,12 @@
-"""Telegram-бот: каталог, корзина и заказы (aiogram 3 + SQLite).
- 
-Клиент:   каталог по категориям -> карточка товара -> корзина -> оформление
-          (самовывоз/доставка, адрес, телефон) -> подтверждение -> «Мои заказы».
-Владелец: новый заказ приходит с кнопками статусов, клиент получает уведомления.
-          /admin — сводка за сегодня и последние заказы.
 """
+Telegram bot: catalog, shopping cart and orders (aiogram 3 + SQLite).
+
+Customer:  category catalog -> product card -> shopping cart -> checkout
+           (pickup/delivery, address, phone) -> confirmation -> "My Orders".
+Owner:     receives new orders with status buttons, customer gets notifications.
+           /admin — today's summary and recent orders.
+"""
+
 import asyncio
 import html
 import json
@@ -39,55 +41,56 @@ TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0") or 0)
 DB_PATH = os.getenv("DB_PATH", "shop.db")
 
-# ======================= НАСТРОЙКИ ПОД КЛИЕНТА =======================
-SHOP_NAME = "Кофейня «Тёплый угол»"
+# ======================= SHOP CONFIGURATION =======================
+SHOP_NAME = "The Cozy Corner Coffee Shop"
 CURRENCY = "€"
-DELIVERY_FEE = 300  # в центах: 3,00 €
-FREE_DELIVERY_FROM = 2500  # бесплатная доставка от 25,00 €
-MAX_QTY = 9  # максимум одной позиции за раз
-MAX_CART_QTY = 20  # максимум одной позиции в корзине
+DELIVERY_FEE = 300  # In cents: €3.00
+FREE_DELIVERY_FROM = 2500  # Free delivery on orders of €25.00 or more
+MAX_QTY = 9  # Maximum quantity per product selection
+MAX_CART_QTY = 20  # Maximum quantity of one product in the cart
 
 WELCOME_IMAGE = Path(__file__).parent / "welcome.png"
 WELCOME_TEXT = (
-    f"👋 Добро пожаловать в <b>{SHOP_NAME}</b>!\n\n"
-    "Выберите напитки и выпечку, оформите заказ за минуту — "
-    "заберите сами или закажите доставку. Мы сообщим, когда всё будет готово."
+    f"👋 Welcome to <b>{SHOP_NAME}</b>!\n\n"
+    "Choose your favorite drinks and pastries and place your order in just a minute — "
+    "pick it up yourself or have it delivered. We'll let you know when everything is ready."
 )
 CONTACTS_TEXT = (
-    "📍 <b>Контакты</b>\n\n"
-    "Адрес: ул. Примерная, 1\n"
-    "Телефон: +49 000 0000000\n"
-    "Часы работы: пн–вс, 08:00–19:00\n\n"
-    f"Доставка: {DELIVERY_FEE / 100:.0f} €, бесплатно от {FREE_DELIVERY_FROM / 100:.0f} €."
+    "📍 <b>Contact Information</b>\n\n"
+    "Address: 1 Example Street\n"
+    "Phone: +49 000 0000000\n"
+    "Opening hours: Mon–Sun, 08:00–19:00\n\n"
+    f"Delivery fee: {DELIVERY_FEE / 100:.0f} €, free for orders over "
+    f"{FREE_DELIVERY_FROM / 100:.0f} €."
 )
 
 CATEGORIES = {
-    "coffee": "☕ Кофе",
-    "bakery": "🥐 Выпечка",
-    "dessert": "🍰 Десерты",
+    "coffee": "☕ Coffee",
+    "bakery": "🥐 Bakery",
+    "dessert": "🍰 Desserts",
 }
-# Цены в центах
+
+# Prices are stored in cents
 ITEMS = {
-    1: {"cat": "coffee", "name": "Эспрессо", "desc": "Классический, насыщенный, 30 мл.", "price": 220},
-    2: {"cat": "coffee", "name": "Капучино", "desc": "Эспрессо с нежной молочной пенкой, 200 мл.", "price": 350},
-    3: {"cat": "coffee", "name": "Латте", "desc": "Мягкий кофе с большим количеством молока, 300 мл.", "price": 380},
-    4: {"cat": "coffee", "name": "Флэт уайт", "desc": "Двойной эспрессо и бархатное молоко, 180 мл.", "price": 390},
-    5: {"cat": "bakery", "name": "Круассан", "desc": "Масляный, свежий, хрустящий.", "price": 250},
-    6: {"cat": "bakery", "name": "Булочка с корицей", "desc": "Тёплая, с ароматной корицей и глазурью.", "price": 280},
-    7: {"cat": "bakery", "name": "Сэндвич с лососем", "desc": "Тосты, сливочный сыр, слабосолёный лосось.",
-        "price": 520},
-    8: {"cat": "dessert", "name": "Чизкейк Нью-Йорк", "desc": "Классический, на песочной основе.", "price": 450},
-    9: {"cat": "dessert", "name": "Тирамису", "desc": "Маскарпоне, савоярди, кофейная пропитка.", "price": 480},
-    10: {"cat": "dessert", "name": "Брауни", "desc": "Шоколадный, с хрустящей корочкой.", "price": 390},
+    1: {"cat": "coffee", "name": "Espresso", "desc": "Classic, rich espresso, 30 ml.", "price": 220},
+    2: {"cat": "coffee", "name": "Cappuccino", "desc": "Espresso topped with silky milk foam, 200 ml.", "price": 350},
+    3: {"cat": "coffee", "name": "Latte", "desc": "Smooth coffee with plenty of milk, 300 ml.", "price": 380},
+    4: {"cat": "coffee", "name": "Flat White", "desc": "Double espresso with velvety milk, 180 ml.", "price": 390},
+    5: {"cat": "bakery", "name": "Croissant", "desc": "Buttery, fresh and crispy.", "price": 250},
+    6: {"cat": "bakery", "name": "Cinnamon Roll", "desc": "Warm pastry with aromatic cinnamon and icing.", "price": 280},
+    7: {"cat": "bakery", "name": "Salmon Sandwich", "desc": "Toasted bread, cream cheese and lightly salted salmon.", "price": 520},
+    8: {"cat": "dessert", "name": "New York Cheesecake", "desc": "Classic cheesecake with a biscuit base.", "price": 450},
+    9: {"cat": "dessert", "name": "Tiramisu", "desc": "Mascarpone, ladyfingers and coffee-soaked layers.", "price": 480},
+    10: {"cat": "dessert", "name": "Brownie", "desc": "Rich chocolate brownie with a crispy crust.", "price": 390},
 }
-# =====================================================================
+# ==================================================================
 
 STATUSES = {
-    "new": "🆕 Новый",
-    "accepted": "👍 Принят",
-    "cooking": "👨‍🍳 Готовится",
-    "ready": "✅ Готов",
-    "cancelled": "❌ Отменён",
+    "new": "🆕 New",
+    "accepted": "👍 Accepted",
+    "cooking": "👨‍🍳 Preparing",
+    "ready": "✅ Ready",
+    "cancelled": "❌ Cancelled",
 }
 ADMIN_STATUS_BUTTONS = ["accepted", "cooking", "ready", "cancelled"]
 
@@ -100,7 +103,7 @@ class Checkout(StatesGroup):
     confirm = State()
 
 
-# ---------- Вспомогательное ----------
+# ---------- Helpers ----------
 def money(cents: int) -> str:
     return f"{cents / 100:.2f}".replace(".", ",") + f" {CURRENCY}"
 
@@ -114,7 +117,7 @@ def delivery_fee(method: str, subtotal: int) -> int:
 
 
 async def safe_edit(message: Message, text: str, kb: InlineKeyboardMarkup | None = None) -> None:
-    """edit_text, который не падает, если содержимое не изменилось."""
+    """Edit a message without raising an error if its content has not changed."""
     try:
         await message.edit_text(text, reply_markup=kb)
     except TelegramBadRequest as e:
@@ -122,7 +125,7 @@ async def safe_edit(message: Message, text: str, kb: InlineKeyboardMarkup | None
             raise
 
 
-# ---------- База данных ----------
+# ---------- Database ----------
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS cart (
     user_id INTEGER NOT NULL,
@@ -135,10 +138,10 @@ CREATE TABLE IF NOT EXISTS orders (
     user_id INTEGER NOT NULL,
     user_name TEXT,
     username TEXT,
-    items TEXT NOT NULL,            -- JSON: [[название, кол-во, цена], ...]
-    total INTEGER NOT NULL,         -- в центах, вместе с доставкой
+    items TEXT NOT NULL,
+    total INTEGER NOT NULL,
     delivery_fee INTEGER NOT NULL DEFAULT 0,
-    method TEXT NOT NULL,           -- pickup | delivery
+    method TEXT NOT NULL,
     address TEXT,
     phone TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'new',
@@ -215,64 +218,67 @@ async def get_order(order_id: int) -> dict | None:
     return rows[0] if rows else None
 
 
-# ---------- Тексты ----------
+# ---------- Text templates ----------
 def order_text(o: dict, admin: bool = False) -> str:
-    lines = [f"📦 <b>Заказ №{o['id']}</b> · {STATUSES[o['status']]}", f"🕒 {o['created_at']}", ""]
+    lines = [f"📦 <b>Order #{o['id']}</b> · {STATUSES[o['status']]}", f"🕒 {o['created_at']}", ""]
     for name, qty, price in json.loads(o["items"]):
         lines.append(f"• {esc(name)} × {qty} — {money(price * qty)}")
     lines.append("")
     if o["method"] == "delivery":
-        fee = money(o["delivery_fee"]) if o["delivery_fee"] else "бесплатно"
-        lines += [f"🚗 Доставка: {fee}", f"Адрес: {esc(o['address'])}"]
+        fee = money(o["delivery_fee"]) if o["delivery_fee"] else "Free"
+        lines += [f"🚗 Delivery: {fee}", f"Address: {esc(o['address'])}"]
     else:
-        lines.append("🏃 Самовывоз")
-    lines += [f"📱 {esc(o['phone'])}", f"<b>Итого: {money(o['total'])}</b>"]
+        lines.append("🏃 Pickup")
+    lines += [f"📱 {esc(o['phone'])}", f"<b>Total: {money(o['total'])}</b>"]
     if admin:
         who = esc(o["user_name"]) + (f" (@{esc(o['username'])})" if o["username"] else "")
-        lines.append(f"👤 {who}")
+        lines.append(f"👤 Customer: {who}")
     return "\n".join(lines)
 
 
 def item_text(item: dict, qty: int) -> str:
     return (
         f"<b>{esc(item['name'])}</b>\n{esc(item['desc'])}\n\n"
-        f"Цена: {money(item['price'])}\nКоличество: {qty}\n"
-        f"Сумма: <b>{money(item['price'] * qty)}</b>"
+        f"Price: {money(item['price'])}\nQuantity: {qty}\n"
+        f"Subtotal: <b>{money(item['price'] * qty)}</b>"
     )
 
 
 def summary_text(lines, subtotal: int, fee: int, method: str, address: str, phone: str) -> str:
-    out = ["📋 <b>Проверьте заказ</b>", ""]
+    out = ["📋 <b>Please review your order</b>", ""]
     for _, item, qty in lines:
         out.append(f"• {esc(item['name'])} × {qty} — {money(item['price'] * qty)}")
     out.append("")
     if method == "delivery":
-        out += [f"🚗 Доставка: {money(fee) if fee else 'бесплатно'}", f"Адрес: {esc(address)}"]
+        out += [f"🚗 Delivery: {money(fee) if fee else 'Free'}", f"Address: {esc(address)}"]
     else:
-        out.append("🏃 Самовывоз")
-    out += [f"📱 {esc(phone)}", f"<b>Итого: {money(subtotal + fee)}</b>"]
+        out.append("🏃 Pickup")
+    out += [f"📱 {esc(phone)}", f"<b>Total: {money(subtotal + fee)}</b>"]
     return "\n".join(out)
 
 
 def client_status_text(o: dict) -> str:
     n = o["id"]
     texts = {
-        "accepted": f"👍 Заказ №{n} принят, скоро начнём готовить.",
-        "cooking": f"👨‍🍳 Заказ №{n} готовится.",
-        "ready": (f"✅ Заказ №{n} готов и скоро будет у вас!" if o["method"] == "delivery"
-                  else f"✅ Заказ №{n} готов — ждём вас!"),
-        "cancelled": f"❌ Заказ №{n} отменён. Если это ошибка — свяжитесь с нами.",
+        "accepted": f"👍 Your order #{n} has been accepted. We'll start preparing it soon.",
+        "cooking": f"👨‍🍳 Your order #{n} is being prepared.",
+        "ready": (
+            f"✅ Your order #{n} is ready and will be delivered soon!"
+            if o["method"] == "delivery"
+            else f"✅ Your order #{n} is ready — we're waiting for you!"
+        ),
+        "cancelled": f"❌ Your order #{n} has been cancelled. If you think this is a mistake, please contact us.",
     }
-    return texts.get(o["status"], f"Заказ №{n}: {STATUSES[o['status']]}")
+    return texts.get(o["status"], f"Order #{n}: {STATUSES[o['status']]}")
 
 
-# ---------- Клавиатуры ----------
+# ---------- Keyboards ----------
 def main_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="🛍 Каталог", callback_data="menu:catalog")
-    kb.button(text="🛒 Корзина", callback_data="menu:cart")
-    kb.button(text="📦 Мои заказы", callback_data="menu:orders")
-    kb.button(text="📍 Контакты", callback_data="menu:contacts")
+    kb.button(text="🛍 Catalog", callback_data="menu:catalog")
+    kb.button(text="🛒 Shopping Cart", callback_data="menu:cart")
+    kb.button(text="📦 My Orders", callback_data="menu:orders")
+    kb.button(text="📍 Contact Information", callback_data="menu:contacts")
     kb.adjust(1, 2, 1)
     return kb.as_markup()
 
@@ -281,8 +287,8 @@ def categories_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for key, title in CATEGORIES.items():
         kb.button(text=title, callback_data=f"cat:{key}")
-    kb.button(text="🛒 Корзина", callback_data="menu:cart")
-    kb.button(text="🏠 Меню", callback_data="menu:home")
+    kb.button(text="🛒 Shopping Cart", callback_data="menu:cart")
+    kb.button(text="🏠 Main Menu", callback_data="menu:home")
     kb.adjust(1, 1, 1, 2)
     return kb.as_markup()
 
@@ -292,8 +298,8 @@ def category_kb(cat: str) -> InlineKeyboardMarkup:
     ids = [i for i, it in ITEMS.items() if it["cat"] == cat]
     for i in ids:
         kb.button(text=f"{ITEMS[i]['name']} — {money(ITEMS[i]['price'])}", callback_data=f"item:{i}:1")
-    kb.button(text="⬅️ Каталог", callback_data="menu:catalog")
-    kb.button(text="🛒 Корзина", callback_data="menu:cart")
+    kb.button(text="⬅️ Back to Catalog", callback_data="menu:catalog")
+    kb.button(text="🛒 Shopping Cart", callback_data="menu:cart")
     kb.adjust(*([1] * len(ids)), 2)
     return kb.as_markup()
 
@@ -302,10 +308,10 @@ def item_kb(item_id: int, qty: int) -> InlineKeyboardMarkup:
     item = ITEMS[item_id]
     kb = InlineKeyboardBuilder()
     kb.button(text="➖", callback_data=f"item:{item_id}:{qty - 1}")
-    kb.button(text=f"{qty} шт", callback_data="noop")
+    kb.button(text=f"{qty} pcs", callback_data="noop")
     kb.button(text="➕", callback_data=f"item:{item_id}:{qty + 1}")
-    kb.button(text=f"🛒 В корзину · {money(item['price'] * qty)}", callback_data=f"add:{item_id}:{qty}")
-    kb.button(text="⬅️ Назад", callback_data=f"cat:{item['cat']}")
+    kb.button(text=f"🛒 Add to Cart · {money(item['price'] * qty)}", callback_data=f"add:{item_id}:{qty}")
+    kb.button(text="⬅️ Back", callback_data=f"cat:{item['cat']}")
     kb.adjust(3, 1, 1)
     return kb.as_markup()
 
@@ -322,31 +328,30 @@ async def render_cart(user_id: int):
     lines, subtotal = await cart_lines(user_id)
     kb = InlineKeyboardBuilder()
     if not lines:
-        kb.button(text="🛍 В каталог", callback_data="menu:catalog")
-        kb.button(text="🏠 Меню", callback_data="menu:home")
+        kb.button(text="🛍 Browse Catalog", callback_data="menu:catalog")
+        kb.button(text="🏠 Main Menu", callback_data="menu:home")
         kb.adjust(2)
-        return "🛒 Корзина пуста.\n\nЗагляните в каталог — там есть из чего выбрать.", kb.as_markup()
-    out = ["🛒 <b>Ваша корзина</b>", ""]
+        return "🛒 Your shopping cart is empty.\n\nTake a look at our catalog — there's plenty to choose from!", kb.as_markup()
+    out = ["🛒 <b>Your Shopping Cart</b>", ""]
     for item_id, item, qty in lines:
         out.append(f"• {esc(item['name'])} × {qty} — {money(item['price'] * qty)}")
         kb.button(text=f"❌ {item['name']}", callback_data=f"cart:del:{item_id}")
-    out += ["", f"Сумма: <b>{money(subtotal)}</b>"]
+    out += ["", f"Subtotal: <b>{money(subtotal)}</b>"]
     if subtotal >= FREE_DELIVERY_FROM:
-        out.append("🎉 Доставка бесплатно")
+        out.append("🎉 Free delivery!")
     else:
-        out.append(f"До бесплатной доставки: {money(FREE_DELIVERY_FROM - subtotal)}")
-    kb.button(text="✅ Оформить заказ", callback_data="checkout:start")
-    kb.button(text="🗑 Очистить", callback_data="cart:clear")
-    kb.button(text="⬅️ Каталог", callback_data="menu:catalog")
+        out.append(f"Spend {money(FREE_DELIVERY_FROM - subtotal)} more to get free delivery.")
+    kb.button(text="✅ Proceed to Checkout", callback_data="checkout:start")
+    kb.button(text="🗑 Clear Cart", callback_data="cart:clear")
+    kb.button(text="⬅️ Back to Catalog", callback_data="menu:catalog")
     kb.adjust(*([2] * ((len(lines) + 1) // 2)), 1, 2)
     return "\n".join(out), kb.as_markup()
 
 
-# ---------- Старт и меню ----------
+# ---------- Start and Main Menu ----------
 @router.message(CommandStart())
 async def cmd_start(m: Message, state: FSMContext):
     await state.clear()
-    # Картинка — отдельным сообщением, чтобы меню можно было редактировать
     if WELCOME_IMAGE.exists():
         await m.answer_photo(FSInputFile(WELCOME_IMAGE))
     await m.answer(WELCOME_TEXT, reply_markup=main_menu())
@@ -355,8 +360,8 @@ async def cmd_start(m: Message, state: FSMContext):
 @router.message(Command("cancel"))
 async def cmd_cancel(m: Message, state: FSMContext):
     await state.clear()
-    await m.answer("Оформление отменено. Корзина сохранена.", reply_markup=ReplyKeyboardRemove())
-    await m.answer("Что дальше?", reply_markup=main_menu())
+    await m.answer("Checkout cancelled. Your shopping cart has been saved.", reply_markup=ReplyKeyboardRemove())
+    await m.answer("What would you like to do next?", reply_markup=main_menu())
 
 
 @router.callback_query(F.data == "noop")
@@ -373,15 +378,15 @@ async def menu_home(c: CallbackQuery):
 @router.callback_query(F.data == "menu:contacts")
 async def menu_contacts(c: CallbackQuery):
     kb = InlineKeyboardBuilder()
-    kb.button(text="⬅️ В меню", callback_data="menu:home")
+    kb.button(text="⬅️ Back to Menu", callback_data="menu:home")
     await safe_edit(c.message, CONTACTS_TEXT, kb.as_markup())
     await c.answer()
 
 
-# ---------- Каталог ----------
+# ---------- Catalog ----------
 @router.callback_query(F.data == "menu:catalog")
 async def menu_catalog(c: CallbackQuery):
-    await safe_edit(c.message, "🛍 <b>Каталог</b>\nЧто хотите заказать?", categories_kb())
+    await safe_edit(c.message, "🛍 <b>Catalog</b>\nWhat would you like to order?", categories_kb())
     await c.answer()
 
 
@@ -391,7 +396,7 @@ async def show_category(c: CallbackQuery):
     if cat not in CATEGORIES:
         await c.answer()
         return
-    await safe_edit(c.message, f"<b>{CATEGORIES[cat]}</b>\nВыберите позицию:", category_kb(cat))
+    await safe_edit(c.message, f"<b>{CATEGORIES[cat]}</b>\nChoose a product:", category_kb(cat))
     await c.answer()
 
 
@@ -400,7 +405,7 @@ async def show_item(c: CallbackQuery):
     _, item_id, qty = c.data.split(":")
     item = ITEMS.get(int(item_id))
     if not item:
-        await c.answer("Позиция недоступна", show_alert=True)
+        await c.answer("This product is unavailable.", show_alert=True)
         return
     qty = max(1, min(MAX_QTY, int(qty)))
     await safe_edit(c.message, item_text(item, qty), item_kb(int(item_id), qty))
@@ -412,15 +417,15 @@ async def add_to_cart(c: CallbackQuery):
     _, item_id, qty = c.data.split(":")
     item = ITEMS.get(int(item_id))
     if not item:
-        await c.answer("Позиция недоступна", show_alert=True)
+        await c.answer("This product is unavailable.", show_alert=True)
         return
     qty = max(1, min(MAX_QTY, int(qty)))
     await cart_add(c.from_user.id, int(item_id), qty)
-    await c.answer(f"Добавлено: {item['name']} × {qty}")
-    await safe_edit(c.message, f"<b>{CATEGORIES[item['cat']]}</b>\nВыберите позицию:", category_kb(item["cat"]))
+    await c.answer(f"Added: {item['name']} × {qty}")
+    await safe_edit(c.message, f"<b>{CATEGORIES[item['cat']]}</b>\nChoose a product:", category_kb(item["cat"]))
 
 
-# ---------- Корзина ----------
+# ---------- Shopping Cart ----------
 @router.callback_query(F.data == "menu:cart")
 async def menu_cart(c: CallbackQuery):
     text, kb = await render_cart(c.from_user.id)
@@ -433,7 +438,7 @@ async def cart_delete(c: CallbackQuery):
     await cart_remove(c.from_user.id, int(c.data.split(":")[2]))
     text, kb = await render_cart(c.from_user.id)
     await safe_edit(c.message, text, kb)
-    await c.answer("Удалено")
+    await c.answer("Product removed.")
 
 
 @router.callback_query(F.data == "cart:clear")
@@ -441,23 +446,24 @@ async def cart_clear_all(c: CallbackQuery):
     await cart_clear(c.from_user.id)
     text, kb = await render_cart(c.from_user.id)
     await safe_edit(c.message, text, kb)
-    await c.answer("Корзина очищена")
+    await c.answer("Shopping cart cleared.")
 
 
-# ---------- Оформление заказа ----------
+# ---------- Checkout ----------
 def phone_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📱 Отправить мой номер", request_contact=True)]],
+        keyboard=[[KeyboardButton(text="📱 Share My Phone Number", request_contact=True)]],
         resize_keyboard=True,
         one_time_keyboard=True,
-        input_field_placeholder="Или напишите номер вручную",
+        input_field_placeholder="Or enter your phone number manually",
     )
 
 
 async def ask_phone(message: Message) -> None:
     await message.answer(
-        "Оставьте номер телефона для связи: нажмите кнопку ниже или напишите его сообщением.\n"
-        "Отмена — /cancel",
+        "Please provide your phone number so we can contact you. "
+        "Tap the button below or type your number in a message.\n"
+        "To cancel, use /cancel",
         reply_markup=phone_kb(),
     )
 
@@ -466,18 +472,18 @@ async def ask_phone(message: Message) -> None:
 async def checkout_start(c: CallbackQuery, state: FSMContext):
     lines, _ = await cart_lines(c.from_user.id)
     if not lines:
-        await c.answer("Корзина пуста", show_alert=True)
+        await c.answer("Your shopping cart is empty.", show_alert=True)
         return
     await state.clear()
     kb = InlineKeyboardBuilder()
-    kb.button(text="🏃 Самовывоз", callback_data="ship:pickup")
+    kb.button(text="🏃 Pickup", callback_data="ship:pickup")
     kb.button(
-        text=f"🚗 Доставка (+{money(DELIVERY_FEE)}, бесплатно от {money(FREE_DELIVERY_FROM)})",
+        text=f"🚗 Delivery (+{money(DELIVERY_FEE)}, free from {money(FREE_DELIVERY_FROM)})",
         callback_data="ship:delivery",
     )
-    kb.button(text="⬅️ В корзину", callback_data="menu:cart")
+    kb.button(text="⬅️ Back to Cart", callback_data="menu:cart")
     kb.adjust(1)
-    await safe_edit(c.message, "Как хотите получить заказ?", kb.as_markup())
+    await safe_edit(c.message, "How would you like to receive your order?", kb.as_markup())
     await c.answer()
 
 
@@ -487,12 +493,12 @@ async def choose_shipping(c: CallbackQuery, state: FSMContext):
     if method == "pickup":
         await state.update_data(method="pickup", address="")
         await state.set_state(Checkout.phone)
-        await safe_edit(c.message, "🏃 Самовывоз. Адрес и часы работы — в разделе «Контакты».")
+        await safe_edit(c.message, "🏃 Pickup selected. You can find our address and opening hours in the Contact Information section.")
         await ask_phone(c.message)
     else:
         await state.update_data(method="delivery")
         await state.set_state(Checkout.address)
-        await safe_edit(c.message, "🚗 Доставка.\nНапишите адрес: улица, дом, квартира.\nОтмена — /cancel")
+        await safe_edit(c.message, "🚗 Delivery selected.\nPlease enter your address: street, house number and apartment.\nTo cancel, use /cancel")
     await c.answer()
 
 
@@ -500,7 +506,7 @@ async def choose_shipping(c: CallbackQuery, state: FSMContext):
 async def got_address(m: Message, state: FSMContext):
     address = m.text.strip()
     if len(address) < 5:
-        await m.answer("Адрес слишком короткий. Напишите улицу, дом и квартиру.")
+        await m.answer("The address is too short. Please enter your street, house number and apartment.")
         return
     await state.update_data(address=address[:200])
     await state.set_state(Checkout.phone)
@@ -511,22 +517,22 @@ async def got_address(m: Message, state: FSMContext):
 async def got_phone(m: Message, state: FSMContext):
     phone = m.contact.phone_number if m.contact else (m.text or "").strip()
     if sum(ch.isdigit() for ch in phone) < 6:
-        await m.answer("Не похоже на номер телефона. Попробуйте ещё раз, например +49 170 1234567.")
+        await m.answer("This doesn't look like a valid phone number. Please try again, e.g. +49 170 1234567.")
         return
     await state.update_data(phone=phone[:30])
     await state.set_state(Checkout.confirm)
-    await m.answer("👌 Номер получен.", reply_markup=ReplyKeyboardRemove())
+    await m.answer("👌 Phone number received.", reply_markup=ReplyKeyboardRemove())
 
     data = await state.get_data()
     lines, subtotal = await cart_lines(m.from_user.id)
     if not lines:
         await state.clear()
-        await m.answer("Корзина пуста. Добавьте что-нибудь из каталога.", reply_markup=main_menu())
+        await m.answer("Your shopping cart is empty. Add something from the catalog first.", reply_markup=main_menu())
         return
     fee = delivery_fee(data["method"], subtotal)
     kb = InlineKeyboardBuilder()
-    kb.button(text="✅ Подтвердить заказ", callback_data="order:confirm")
-    kb.button(text="❌ Отмена", callback_data="order:cancel")
+    kb.button(text="✅ Confirm Order", callback_data="order:confirm")
+    kb.button(text="❌ Cancel", callback_data="order:cancel")
     kb.adjust(1)
     await m.answer(
         summary_text(lines, subtotal, fee, data["method"], data.get("address", ""), data["phone"]),
@@ -537,7 +543,7 @@ async def got_phone(m: Message, state: FSMContext):
 @router.callback_query(F.data == "order:cancel")
 async def order_cancel(c: CallbackQuery, state: FSMContext):
     await state.clear()
-    await safe_edit(c.message, "Оформление отменено. Корзина сохранена.", main_menu())
+    await safe_edit(c.message, "Checkout cancelled. Your shopping cart has been saved.", main_menu())
     await c.answer()
 
 
@@ -546,12 +552,12 @@ async def order_confirm(c: CallbackQuery, state: FSMContext, bot: Bot):
     data = await state.get_data()
     if not data.get("method") or not data.get("phone"):
         await state.clear()
-        await c.answer("Сессия устарела, оформите заказ заново", show_alert=True)
+        await c.answer("Your session has expired. Please start checkout again.", show_alert=True)
         return
     lines, subtotal = await cart_lines(c.from_user.id)
     if not lines:
         await state.clear()
-        await c.answer("Корзина пуста", show_alert=True)
+        await c.answer("Your shopping cart is empty.", show_alert=True)
         return
     fee = delivery_fee(data["method"], subtotal)
     order_id = await create_order(c.from_user, lines, fee, data["method"], data.get("address", ""), data["phone"])
@@ -560,43 +566,43 @@ async def order_confirm(c: CallbackQuery, state: FSMContext, bot: Bot):
 
     await safe_edit(
         c.message,
-        f"🎉 <b>Заказ №{order_id} принят!</b>\n\n{order_text(order)}\n\nМы сообщим, когда всё будет готово.",
+        f"🎉 <b>Order #{order_id} has been placed!</b>\n\n{order_text(order)}\n\nWe'll notify you when everything is ready.",
         main_menu(),
     )
     if ADMIN_ID:
         try:
             await bot.send_message(ADMIN_ID, order_text(order, admin=True), reply_markup=admin_kb(order_id))
         except (TelegramBadRequest, TelegramForbiddenError):
-            logging.warning("Не удалось отправить уведомление владельцу (ADMIN_ID=%s)", ADMIN_ID)
-    await c.answer("Заказ оформлен")
+            logging.warning("Failed to send order notification to the owner (ADMIN_ID=%s)", ADMIN_ID)
+    await c.answer("Order placed successfully!")
 
 
-# ---------- Мои заказы ----------
+# ---------- My Orders ----------
 @router.message(Command("orders"))
 async def cmd_orders(m: Message):
     rows = await q_all("SELECT * FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 3", (m.from_user.id,))
-    text = "\n\n".join(order_text(o) for o in rows) if rows else "У вас пока нет заказов."
+    text = "\n\n".join(order_text(o) for o in rows) if rows else "You haven't placed any orders yet."
     await m.answer(text, reply_markup=main_menu())
 
 
 @router.callback_query(F.data == "menu:orders")
 async def menu_orders(c: CallbackQuery):
     rows = await q_all("SELECT * FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 3", (c.from_user.id,))
-    text = "<b>Последние заказы</b>\n\n" + "\n\n".join(
-        order_text(o) for o in rows) if rows else "У вас пока нет заказов."
+    text = "<b>Recent Orders</b>\n\n" + "\n\n".join(
+        order_text(o) for o in rows) if rows else "You haven't placed any orders yet."
     kb = InlineKeyboardBuilder()
-    kb.button(text="🛍 Каталог", callback_data="menu:catalog")
-    kb.button(text="🏠 Меню", callback_data="menu:home")
+    kb.button(text="🛍 Catalog", callback_data="menu:catalog")
+    kb.button(text="🏠 Main Menu", callback_data="menu:home")
     kb.adjust(2)
     await safe_edit(c.message, text, kb.as_markup())
     await c.answer()
 
 
-# ---------- Владелец ----------
+# ---------- Owner / Admin ----------
 @router.callback_query(F.data.startswith("st:"))
 async def change_status(c: CallbackQuery, bot: Bot):
     if c.from_user.id != ADMIN_ID:
-        await c.answer("Нет доступа", show_alert=True)
+        await c.answer("Access denied.", show_alert=True)
         return
     _, order_id, status = c.data.split(":")
     if status not in STATUSES:
@@ -605,14 +611,14 @@ async def change_status(c: CallbackQuery, bot: Bot):
     await run("UPDATE orders SET status=? WHERE id=?", (status, int(order_id)))
     order = await get_order(int(order_id))
     if not order:
-        await c.answer("Заказ не найден", show_alert=True)
+        await c.answer("Order not found.", show_alert=True)
         return
     await safe_edit(c.message, order_text(order, admin=True), admin_kb(order["id"]))
     try:
         await bot.send_message(order["user_id"], client_status_text(order))
     except (TelegramBadRequest, TelegramForbiddenError):
-        pass  # клиент мог заблокировать бота
-    await c.answer("Статус обновлён")
+        pass  # The customer may have blocked the bot
+    await c.answer("Order status updated.")
 
 
 @router.message(Command("admin"))
@@ -626,31 +632,31 @@ async def cmd_admin(m: Message):
         (f"{today}%",),
     )
     recent = await q_all("SELECT * FROM orders ORDER BY id DESC LIMIT 10")
-    out = [f"📊 <b>Сегодня:</b> {stats[0]['n']} заказов на {money(stats[0]['s'])}", ""]
+    out = [f"📊 <b>Today:</b> {stats[0]['n']} orders totaling {money(stats[0]['s'])}", ""]
     if recent:
-        out.append("<b>Последние заказы:</b>")
+        out.append("<b>Recent Orders:</b>")
         for o in recent:
-            out.append(f"№{o['id']} · {o['created_at'][11:16]} · {money(o['total'])} · {STATUSES[o['status']]}")
+            out.append(f"#{o['id']} · {o['created_at'][11:16]} · {money(o['total'])} · {STATUSES[o['status']]}")
     else:
-        out.append("Заказов пока нет.")
+        out.append("No orders yet.")
     await m.answer("\n".join(out))
 
 
 @router.message()
 async def fallback(m: Message):
-    await m.answer("Откройте меню: /start")
+    await m.answer("Open the menu using /start")
 
 
 async def main() -> None:
     if not TOKEN:
-        raise SystemExit("Укажите BOT_TOKEN в файле .env")
+        raise SystemExit("Please specify BOT_TOKEN in your .env file.")
     logging.basicConfig(level=logging.INFO)
     await init_db()
     bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     await bot.set_my_commands([
-        BotCommand(command="start", description="Меню"),
-        BotCommand(command="orders", description="Мои заказы"),
-        BotCommand(command="cancel", description="Отменить оформление"),
+        BotCommand(command="start", description="Open main menu"),
+        BotCommand(command="orders", description="View my orders"),
+        BotCommand(command="cancel", description="Cancel checkout"),
     ])
     dp = Dispatcher()
     dp.include_router(router)
